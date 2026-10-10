@@ -472,14 +472,23 @@ export class BrowserAuxiliaryWindowService extends Disposable implements IAuxili
 				return; // global stylesheets are handled by `cloneGlobalStylesheets` below
 			}
 
-			const clonedNode = auxiliaryWindow.document.head.appendChild(originalNode.cloneNode(true));
-			if (originalNode.tagName.toLowerCase() === 'link') {
+			const clonedNode = originalNode.cloneNode(true);
+			// Development CSS modules populate an otherwise empty style element through
+			// CSSOM. cloneNode does not copy those rules (including their @imports).
+			let hasImports = false;
+			if (originalNode.tagName.toLowerCase() === 'style' && !originalNode.textContent?.trim()) {
+				const rules = Array.from((originalNode as HTMLStyleElement).sheet?.cssRules ?? []);
+				clonedNode.textContent = rules.map(rule => rule.cssText).join('\n');
+				hasImports = rules.some(rule => rule.type === CSSRule.IMPORT_RULE);
+			}
+			if (originalNode.tagName.toLowerCase() === 'link' || hasImports) {
 				pendingLinksToSettle++;
 
 				pendingLinksDisposables.add(addDisposableListener(clonedNode, 'load', onLinkSettled));
 				pendingLinksDisposables.add(addDisposableListener(clonedNode, 'error', onLinkSettled));
 			}
 
+			auxiliaryWindow.document.head.appendChild(clonedNode);
 			mapOriginalToClone.set(originalNode, clonedNode);
 		}
 

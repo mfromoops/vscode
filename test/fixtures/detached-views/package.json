@@ -1,0 +1,17 @@
+{
+  "name": "detached-views-fixture",
+  "displayName": "Detached Views Fixture",
+  "publisher": "code-oss-tests",
+  "version": "0.0.1",
+  "license": "MIT",
+  "engines": { "vscode": "^1.100.0" },
+  "main": "./out/extension.js",
+  "activationEvents": ["onView:detachedFixture.tree", "onView:detachedFixture.webview"],
+  "contributes": {
+    "viewsContainers": { "activitybar": [{ "id": "detachedFixture", "title": "Detached Fixture", "icon": "icon.svg" }] },
+    "views": { "detachedFixture": [
+      { "id": "detachedFixture.tree", "name": "Fixture Tree" },
+      { "id": "detachedFixture.webview", "name": "Fixture Webview", "type": "webview" }
+    ] }
+  }
+}

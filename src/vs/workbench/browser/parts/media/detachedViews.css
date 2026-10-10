@@ -1,0 +1,32 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+.monaco-workbench .part.detached-view {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	height: 100%;
+	background: var(--vscode-sideBar-background);
+	color: var(--vscode-sideBar-foreground);
+}
+
+.monaco-workbench .part.detached-view > .title {
+	flex: 0 0 35px;
+	align-items: center;
+	border-bottom: 1px solid var(--vscode-sideBar-border, transparent);
+}
+
+.monaco-workbench .part.detached-view .detached-view-label {
+	padding-left: 12px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.monaco-workbench .part.detached-view > .content {
+	flex: 1;
+	min-height: 0;
+	position: relative;
+}

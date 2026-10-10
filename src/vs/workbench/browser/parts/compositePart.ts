@@ -6,7 +6,7 @@
 import './media/compositepart.css';
 import { localize } from '../../../nls.js';
 import { defaultGenerator } from '../../../base/common/idGenerator.js';
-import { IDisposable, dispose, DisposableStore, MutableDisposable, } from '../../../base/common/lifecycle.js';
+import { IDisposable, dispose, DisposableStore, MutableDisposable, toDisposable } from '../../../base/common/lifecycle.js';
 import { Emitter } from '../../../base/common/event.js';
 import { isCancellationError } from '../../../base/common/errors.js';
 import { ActionsOrientation, IActionViewItem, prepareActions } from '../../../base/browser/ui/actionbar/actionbar.js';
@@ -37,6 +37,11 @@ import { IBaseActionViewItemOptions } from '../../../base/browser/ui/actionbar/a
 import { IHoverDelegate } from '../../../base/browser/ui/hover/hoverDelegate.js';
 import { createInstantHoverDelegate, getDefaultHoverDelegate } from '../../../base/browser/ui/hover/hoverDelegateFactory.js';
 import type { IHoverService } from '../../../platform/hover/browser/hover.js';
+
+export interface IDetachedComposite extends IDisposable {
+	readonly composite: Composite;
+	readonly container: HTMLElement;
+}
 
 export interface ICompositeTitleLabel {
 
@@ -73,6 +78,42 @@ export abstract class CompositePart<T extends Composite, MementoType extends obj
 	private readonly mapCompositeToCompositeContainer = new Map<string, HTMLElement>();
 	private readonly mapActionsBindingToComposite = new Map<string, () => void>();
 	private activeComposite: Composite | undefined;
+	private readonly detachedComposites = new Map<string, { focus: () => void; release: () => void }>();
+
+	getDetachedComposite(id: string, focus = false): Composite | undefined {
+		const detached = this.detachedComposites.get(id);
+		if (!detached) {
+			return undefined;
+		}
+		if (focus) {
+			detached.focus();
+		}
+		return this.instantiatedCompositeItems.get(id)?.composite;
+	}
+
+	closeDetachedComposite(id: string): void {
+		this.detachedComposites.get(id)?.release();
+	}
+
+	/** Transfers layout and visibility ownership without recreating the composite or its views. */
+	detachComposite(id: string, focus: () => void, release: () => void): IDetachedComposite | undefined {
+		const composite = this.instantiatedCompositeItems.get(id)?.composite;
+		const container = this.mapCompositeToCompositeContainer.get(id);
+		if (!composite || !container || this.detachedComposites.has(id)) {
+			return undefined;
+		}
+		if (this.activeComposite === composite) {
+			this.hideActiveComposite();
+		}
+		this.detachedComposites.set(id, { focus, release });
+		return Object.assign(toDisposable(() => {
+			this.detachedComposites.delete(id);
+			composite.setVisible(false);
+			container.remove();
+			hide(container);
+		}), { composite, container });
+	}
+
 	private lastActiveCompositeId: string;
 	private readonly instantiatedCompositeItems = new Map<string, CompositeItem>();
 	protected titleLabel: ICompositeTitleLabel | undefined;
@@ -110,6 +151,10 @@ export abstract class CompositePart<T extends Composite, MementoType extends obj
 	}
 
 	protected openComposite(id: string, focus?: boolean): Composite | undefined {
+		const detached = this.getDetachedComposite(id, focus);
+		if (detached) {
+			return detached;
+		}
 
 		// Check if composite already visible and just focus in that case
 		if (this.activeComposite?.getId() === id) {
@@ -533,6 +578,7 @@ export abstract class CompositePart<T extends Composite, MementoType extends obj
 	}
 
 	protected removeComposite(compositeId: string): boolean {
+		this.detachedComposites.get(compositeId)?.release();
 		if (this.activeComposite?.getId() === compositeId) {
 			return false; // do not remove active composite
 		}
@@ -550,6 +596,9 @@ export abstract class CompositePart<T extends Composite, MementoType extends obj
 	}
 
 	override dispose(): void {
+		for (const detached of this.detachedComposites.values()) {
+			detached.release();
+		}
 		this.mapCompositeToCompositeContainer.clear();
 		this.mapActionsBindingToComposite.clear();
 

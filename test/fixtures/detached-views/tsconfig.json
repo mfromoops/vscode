@@ -1,0 +1,11 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "commonjs",
+		"outDir": "out",
+		"strict": true,
+		"skipLibCheck": true,
+		"types": []
+	},
+	"files": ["extension.ts", "../../../src/vscode-dts/vscode.d.ts"]
+}

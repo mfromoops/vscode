@@ -90,8 +90,21 @@ class TestCompositePart extends CompositePart<TestComposite> {
 		);
 	}
 
+	override create(parent: HTMLElement): void {
+		this.element = parent;
+		super.create(parent);
+	}
+
 	createTestComposite(): TestComposite {
 		return this.createComposite(TestComposite.ID);
+	}
+
+	openTestComposite(focus = false): Composite | undefined {
+		return this.openComposite(TestComposite.ID, focus);
+	}
+
+	get activeTestComposite() {
+		return this.getActiveComposite();
 	}
 
 	removeTestComposite(): boolean {
@@ -149,4 +162,67 @@ suite('CompositePart', () => {
 		assert.strictEqual(part.removeTestComposite(), true);
 		assert.strictEqual(part.hasCompositeOpenListeners(), false);
 	});
+
+	test('detachment transfers ownership, preserves identity, and supports repeated return', () => {
+		const storageService = disposables.add(new TestStorageService());
+		const themeService = new TestThemeService();
+		const instantiationService = disposables.add(new TestInstantiationService(new ServiceCollection(
+			[ITelemetryService, NullTelemetryService], [IThemeService, themeService], [IStorageService, storageService],
+		)));
+		const registry = disposables.add(new TestCompositeRegistry());
+		registry.register(new TestCompositeDescriptor());
+		const part = disposables.add(new TestCompositePart(instantiationService, registry, storageService, themeService, new TestLayoutService()));
+		part.create(fixture);
+		const composite = part.openTestComposite();
+		const childDocument = document.implementation.createHTMLDocument('detached');
+		let focuses = 0;
+		const snapshots: object[] = [];
+		for (let i = 0; i < 3; i++) {
+			const lease = part.detachComposite(TestComposite.ID, () => focuses++, () => lease?.dispose());
+			assert.ok(lease);
+			childDocument.body.appendChild(lease.container);
+			lease.composite.setVisible(true);
+			snapshots.push({
+				active: part.activeTestComposite,
+				same: part.openTestComposite(true) === composite,
+				child: lease.container.ownerDocument === childDocument,
+				duplicate: part.detachComposite(TestComposite.ID, () => { }, () => { }),
+			});
+			lease.dispose();
+			lease.dispose();
+			part.openTestComposite();
+			snapshots.push({ same: part.activeTestComposite === composite, main: lease.container.ownerDocument === document });
+		}
+		assert.deepStrictEqual({ snapshots, focuses }, {
+			snapshots: Array.from({ length: 3 }, () => [
+				{ active: undefined, same: true, child: true, duplicate: undefined },
+				{ same: true, main: true },
+			]).flat(),
+			focuses: 3,
+		});
+	});
+
+	test('removing a detached composite releases its host before disposal', () => {
+		const storageService = disposables.add(new TestStorageService());
+		const themeService = new TestThemeService();
+		const instantiationService = disposables.add(new TestInstantiationService(new ServiceCollection(
+			[ITelemetryService, NullTelemetryService], [IThemeService, themeService], [IStorageService, storageService],
+		)));
+		const registry = disposables.add(new TestCompositeRegistry());
+		registry.register(new TestCompositeDescriptor());
+		const part = disposables.add(new TestCompositePart(instantiationService, registry, storageService, themeService, new TestLayoutService()));
+		part.create(fixture);
+		part.openTestComposite();
+		let released = false;
+		const lease = part.detachComposite(TestComposite.ID, () => { }, () => {
+			released = true;
+			lease?.dispose();
+		});
+		assert.ok(lease);
+		const removed = part.removeTestComposite();
+		assert.deepStrictEqual({ removed, released, detached: part.getDetachedComposite(TestComposite.ID) }, {
+			removed: true, released: true, detached: undefined
+		});
+	});
+
 });

@@ -201,6 +201,9 @@ export class ViewsService extends Disposable implements IViewsService {
 
 	// One view container can be visible at a time in a location
 	isViewContainerVisible(id: string): boolean {
+		if (this.paneCompositeService.getDetachedPaneComposite?.(id)) {
+			return true;
+		}
 		const viewContainer = this.viewDescriptorService.getViewContainerById(id);
 		if (!viewContainer) {
 			return false;
@@ -252,6 +255,10 @@ export class ViewsService extends Disposable implements IViewsService {
 	}
 
 	async closeViewContainer(id: string): Promise<void> {
+		if (this.paneCompositeService.getDetachedPaneComposite?.(id)) {
+			this.paneCompositeService.closeDetachedPaneComposite?.(id);
+			return;
+		}
 		const viewContainer = this.viewDescriptorService.getViewContainerById(id);
 		if (viewContainer) {
 			const viewContainerLocation = this.viewDescriptorService.getViewContainerLocation(viewContainer);
@@ -312,7 +319,7 @@ export class ViewsService extends Disposable implements IViewsService {
 		const location = this.viewDescriptorService.getViewContainerLocation(viewContainer);
 		const compositeDescriptor = this.getComposite(viewContainer.id, location!);
 		if (compositeDescriptor) {
-			const paneComposite = await this.openComposite(compositeDescriptor.id, location!) as IPaneComposite | undefined;
+			const paneComposite = await this.openComposite(compositeDescriptor.id, location!, focus && !!this.paneCompositeService.getDetachedPaneComposite?.(viewContainer.id)) as IPaneComposite | undefined;
 			if (paneComposite?.openView) {
 				return paneComposite.openView<T>(id, focus) || null;
 			} else if (focus) {
@@ -331,6 +338,10 @@ export class ViewsService extends Disposable implements IViewsService {
 				const view = activeViewPaneContainer.getView(id);
 				if (view) {
 					if (activeViewPaneContainer.views.length === 1) {
+						if (this.paneCompositeService.getDetachedPaneComposite?.(viewContainer.id)) {
+							this.paneCompositeService.closeDetachedPaneComposite?.(viewContainer.id);
+							return;
+						}
 						const location = this.viewDescriptorService.getViewContainerLocation(viewContainer);
 						if (location === ViewContainerLocation.Sidebar) {
 							this.layoutService.setPartHidden(true, Parts.SIDEBAR_PART);
@@ -353,6 +364,10 @@ export class ViewsService extends Disposable implements IViewsService {
 	}
 
 	private getActiveViewPaneContainer(viewContainer: ViewContainer): IViewPaneContainer | null {
+		const detached = this.paneCompositeService.getDetachedPaneComposite?.(viewContainer.id);
+		if (detached) {
+			return detached.getViewPaneContainer() ?? null;
+		}
 		const location = this.viewDescriptorService.getViewContainerLocation(viewContainer);
 		if (location === null) {
 			return null;
@@ -382,7 +397,7 @@ export class ViewsService extends Disposable implements IViewsService {
 			return undefined;
 		}
 
-		if (viewPaneContainer.isViewMergedWithContainer()) {
+		if (viewPaneContainer.isViewMergedWithContainer() && !this.paneCompositeService.getDetachedPaneComposite?.(viewContainer.id)) {
 			return this.getViewContainerProgressIndicator(viewContainer);
 		}
 
@@ -520,6 +535,11 @@ export class ViewsService extends Disposable implements IViewsService {
 				const contextKeyService = serviceAccessor.get(IContextKeyService);
 
 				const focusedViewId = FocusedViewContext.getValue(contextKeyService);
+				const container = viewDescriptorService.getViewContainerByViewId(viewDescriptor.id);
+				if (container && that.paneCompositeService.getDetachedPaneComposite?.(container.id)) {
+					await viewsService.openView(viewDescriptor.id, !options?.preserveFocus);
+					return;
+				}
 				if (focusedViewId === viewDescriptor.id && !options?.preserveFocus) {
 
 					const viewLocation = viewDescriptorService.getViewLocationById(viewDescriptor.id);

@@ -9,6 +9,7 @@ import { PaneCompositeDescriptor } from '../../../browser/panecomposite.js';
 import { IProgressIndicator } from '../../../../platform/progress/common/progress.js';
 import { IPaneComposite } from '../../../common/panecomposite.js';
 import { ViewContainerLocation } from '../../../common/views.js';
+import { IDetachedComposite } from '../../../browser/parts/compositePart.js';
 import { SINGLE_WINDOW_PARTS } from '../../layout/browser/layoutService.js';
 
 export const IPaneCompositePartService = createDecorator<IPaneCompositePartService>('paneCompositePartService');
@@ -16,6 +17,10 @@ export const IPaneCompositePartService = createDecorator<IPaneCompositePartServi
 export interface IPaneCompositePartService {
 
 	readonly _serviceBrand: undefined;
+
+	getDetachedPaneComposite?(id: string): IPaneComposite | undefined;
+	closeDetachedPaneComposite?(id: string): void;
+	detachPaneComposite?(id: string, location: ViewContainerLocation, focus: () => void, release: () => void): IDetachedComposite | undefined;
 
 	readonly onDidPaneCompositeOpen: Event<{ composite: IPaneComposite; viewContainerLocation: ViewContainerLocation }>;
 	readonly onDidPaneCompositeClose: Event<{ composite: IPaneComposite; viewContainerLocation: ViewContainerLocation }>;

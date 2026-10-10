@@ -376,6 +376,12 @@ export abstract class ViewPane extends Pane implements IView {
 
 	protected readonly scopedContextKeyService: IContextKeyService;
 
+	/** Updates context inheritance when the same view is hosted in another window. */
+	setParentContextKeyService(parent: IContextKeyService = this.contextKeyService): void {
+		this.scopedContextKeyService.updateParent(parent);
+	}
+
+
 	constructor(
 		options: IViewPaneOptions,
 		@IKeybindingService protected keybindingService: IKeybindingService,

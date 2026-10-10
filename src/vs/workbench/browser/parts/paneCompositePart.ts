@@ -13,7 +13,7 @@ import { IViewDescriptorService, ViewContainerLocation } from '../../common/view
 import { DisposableStore, IDisposable, MutableDisposable } from '../../../base/common/lifecycle.js';
 import { IView } from '../../../base/browser/ui/grid/grid.js';
 import { IWorkbenchLayoutService, Parts, SINGLE_WINDOW_PARTS, getFloatingOuterGutterEdges, getFloatingPaneCompositeHorizontalMargins, getFloatingPaneCompositeVerticalMargins, getFloatingPaneCompositeVerticalOuterEdges } from '../../services/layout/browser/layoutService.js';
-import { CompositePart, ICompositePartOptions, ICompositeTitleLabel } from './compositePart.js';
+import { CompositePart, ICompositePartOptions, ICompositeTitleLabel, IDetachedComposite } from './compositePart.js';
 import { IPaneCompositeBarOptions, PaneCompositeBar } from './paneCompositeBar.js';
 import { Dimension, EventHelper, trackFocus, $, addDisposableListener, EventType, prepend, getWindow, scheduleAtNextAnimationFrame, computeScreenAwareSize } from '../../../base/browser/dom.js';
 import { Registry } from '../../../platform/registry/common/platform.js';
@@ -51,6 +51,9 @@ export interface IPaneCompositePart extends IView {
 
 	readonly partId: SINGLE_WINDOW_PARTS;
 	readonly registryId: string;
+	getDetachedComposite?(id: string, focus?: boolean): Composite | undefined;
+	closeDetachedComposite?(id: string): void;
+	detachComposite?(id: string, focus: () => void, release: () => void): IDetachedComposite | undefined;
 
 	readonly onDidPaneCompositeOpen: Event<IPaneComposite>;
 	readonly onDidPaneCompositeClose: Event<IPaneComposite>;
@@ -502,6 +505,10 @@ export abstract class AbstractPaneCompositePart extends CompositePart<PaneCompos
 	}
 
 	async openPaneComposite(id?: string, focus?: boolean): Promise<PaneComposite | undefined> {
+		const detached = id ? this.getDetachedComposite(id, focus) : undefined;
+		if (detached) {
+			return detached as PaneComposite;
+		}
 		if (typeof id === 'string' && this.getPaneComposite(id)) {
 			return this.doOpenPaneComposite(id, focus);
 		}
